@@ -1,10 +1,15 @@
+# 1. Install aria2 (Required for fast downloads)
+apt-get update && apt-get install -y aria2
+
+# 2. Create the script with the CORRECT path for your setup
+cat << 'EOF' > fast_wan_corrected.sh
 #!/bin/bash
 
-# ==============================================================================
-# FAST RunPod ComfyUI Auto-Installer (Uses aria2c for speed)
-# ==============================================================================
+# --- PATH CORRECTION FOR YOUR SETUP ---
+# We use $(pwd) so it works exactly where you are inside 'runpod-slim'
+BASE_DIR="$(pwd)/ComfyUI" 
+echo "📍 Detected Install Path: $BASE_DIR"
 
-BASE_DIR="/workspace/ComfyUI"
 CUSTOM_NODES_DIR="${BASE_DIR}/custom_nodes"
 MODELS_DIR="${BASE_DIR}/models"
 
@@ -15,6 +20,7 @@ VAE_DIR="${MODELS_DIR}/vae"
 CLIP_VISION_DIR="${MODELS_DIR}/clip_vision"
 TEXT_ENCODER_DIR="${MODELS_DIR}/text_encoders"
 
+# Create directories if they don't exist
 mkdir -p "$DIFFUSION_MODELS_DIR" "$LORA_DIR" "$VAE_DIR" "$CLIP_VISION_DIR" "$TEXT_ENCODER_DIR"
 
 # ------------------------------------------------------------------------------
@@ -30,7 +36,7 @@ fast_download() {
         echo "⚠️  File exists: $filename (Skipping)"
     else
         echo "⬇️  Downloading (FAST): $filename..."
-        # -x 16 = 16 connections, -s 16 = 16 splits, -c = continue if interrupted
+        # 16 connections per file for max speed
         aria2c --console-log-level=error -c -x 16 -s 16 -k 1M "$url" -d "$dest_dir" -o "$filename"
         
         if [ $? -eq 0 ]; then
@@ -55,6 +61,7 @@ install_node() {
     fi
 
     if [ -f "$target_dir/requirements.txt" ]; then
+        echo "📦 Installing requirements for $dirname..."
         pip install -r "$target_dir/requirements.txt"
     fi
 }
@@ -87,3 +94,8 @@ fast_download "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resol
 fast_download "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" "$TEXT_ENCODER_DIR" "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
 
 echo "🎉 Done! Restart ComfyUI."
+EOF
+
+# 3. Run it
+chmod +x fast_wan_corrected.sh
+./fast_wan_corrected.sh
