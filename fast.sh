@@ -1,14 +1,24 @@
-# 1. Install aria2 (Required for fast downloads)
-apt-get update && apt-get install -y aria2
-
-# 2. Create the script with the CORRECT path for your setup
-cat << 'EOF' > fast_wan_corrected.sh
 #!/bin/bash
 
-# --- PATH CORRECTION FOR YOUR SETUP ---
-# We use $(pwd) so it works exactly where you are inside 'runpod-slim'
-BASE_DIR="$(pwd)/ComfyUI" 
-echo "📍 Detected Install Path: $BASE_DIR"
+# ==============================================================================
+# UPDATED RUNPOD INSTALLER + DWPREPROCESSOR FIX
+# ==============================================================================
+
+# 1. Install aria2 for speed
+apt-get update && apt-get install -y aria2
+
+# 2. Detect Path (Fixes the "wrong folder" issue)
+# checks if we are in runpod-slim and adjusts
+if [ -d "/workspace/runpod-slim/ComfyUI" ]; then
+    BASE_DIR="/workspace/runpod-slim/ComfyUI"
+elif [ -d "/workspace/ComfyUI" ]; then
+    BASE_DIR="/workspace/ComfyUI"
+else
+    # Fallback to current directory
+    BASE_DIR="$(pwd)/ComfyUI"
+fi
+
+echo "📍 Using ComfyUI Path: $BASE_DIR"
 
 CUSTOM_NODES_DIR="${BASE_DIR}/custom_nodes"
 MODELS_DIR="${BASE_DIR}/models"
@@ -20,11 +30,11 @@ VAE_DIR="${MODELS_DIR}/vae"
 CLIP_VISION_DIR="${MODELS_DIR}/clip_vision"
 TEXT_ENCODER_DIR="${MODELS_DIR}/text_encoders"
 
-# Create directories if they don't exist
+# Create directories
 mkdir -p "$DIFFUSION_MODELS_DIR" "$LORA_DIR" "$VAE_DIR" "$CLIP_VISION_DIR" "$TEXT_ENCODER_DIR"
 
 # ------------------------------------------------------------------------------
-# FAST DOWNLOAD FUNCTION (ARIA2)
+# 1. FAST DOWNLOAD FUNCTION
 # ------------------------------------------------------------------------------
 fast_download() {
     local url="$1"
@@ -35,34 +45,37 @@ fast_download() {
     if [ -f "$filepath" ]; then
         echo "⚠️  File exists: $filename (Skipping)"
     else
-        echo "⬇️  Downloading (FAST): $filename..."
-        # 16 connections per file for max speed
+        echo "⬇️  Downloading: $filename..."
         aria2c --console-log-level=error -c -x 16 -s 16 -k 1M "$url" -d "$dest_dir" -o "$filename"
-        
-        if [ $? -eq 0 ]; then
-            echo "✅ Finished: $filename"
-        else
-            echo "❌ Failed: $filename"
-        fi
     fi
 }
 
+# ------------------------------------------------------------------------------
+# 2. NODE INSTALLATION + FIXES
+# ------------------------------------------------------------------------------
 install_node() {
     local url="$1"
     local dirname=$(basename "$url" .git)
     local target_dir="${CUSTOM_NODES_DIR}/${dirname}"
 
     if [ -d "$target_dir" ]; then
-        echo "⚠️  Node exists: $dirname. Updating..."
+        echo "🔄 Updating: $dirname..."
         cd "$target_dir" && git pull && cd ..
     else
         echo "⬇️  Cloning: $dirname..."
         git clone "$url" "$target_dir"
     fi
 
+    # STANDARD REQUIREMENTS
     if [ -f "$target_dir/requirements.txt" ]; then
         echo "📦 Installing requirements for $dirname..."
         pip install -r "$target_dir/requirements.txt"
+    fi
+
+    # --- SPECIFIC FIX FOR CONTROLNET AUX (DWPREPROCESSOR) ---
+    if [ "$dirname" == "comfyui_controlnet_aux" ]; then
+        echo "🛠️  Applying FIX for DWPreprocessor (Mediapipe)..."
+        pip install mediapipe opencv-python-headless
     fi
 }
 
@@ -70,14 +83,13 @@ install_node() {
 # EXECUTION
 # ==============================================================================
 
-echo "🚀 --- INSTALLING NODES ---"
+echo "🚀 --- INSTALLING & FIXING NODES ---"
 install_node "https://github.com/kijai/ComfyUI-segment-anything-2"
 install_node "https://github.com/kijai/ComfyUI-KJNodes"
 install_node "https://github.com/Fannovel16/comfyui_controlnet_aux"
 
-echo "🚀 --- FAST DOWNLOADING MODELS (70GB+) ---"
-
-# Diffusion Model (~14GB)
+echo "🚀 --- CHECKING MODELS ---"
+# Wan2.1 Diffusion Model
 fast_download "https://huggingface.co/Kijai/WanVideo_comfy_fp8_scaled/resolve/main/Wan22Animate/Wan2_2-Animate-14B_fp8_e4m3fn_scaled_KJ.safetensors" "$DIFFUSION_MODELS_DIR" "Wan2_2-Animate-14B_fp8_e4m3fn_scaled_KJ.safetensors"
 
 # LoRAs
@@ -90,12 +102,7 @@ fast_download "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resol
 # VAE
 fast_download "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors" "$VAE_DIR" "wan_2.1_vae.safetensors"
 
-# Text Encoder (~10GB)
+# Text Encoder
 fast_download "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" "$TEXT_ENCODER_DIR" "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
 
-echo "🎉 Done! Restart ComfyUI."
-EOF
-
-# 3. Run it
-chmod +x fast_wan_corrected.sh
-./fast_wan_corrected.sh
+echo "✅ DONE! You MUST restart the Pod (or the ComfyUI process) for the fixes to apply."
