@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# FLUX 2 INSTALLER
+# FLUX 2 INSTALLER + WORKFLOW
 # ==============================================================================
 
 # 1. Install aria2 for speed
@@ -20,14 +20,15 @@ fi
 echo "📍 Using ComfyUI Path: $BASE_DIR"
 
 MODELS_DIR="${BASE_DIR}/models"
+WORKFLOWS_DIR="${BASE_DIR}/user/default/workflows"
 
-# Define Directories
+# Define Model Directories
 DIFFUSION_MODELS_DIR="${MODELS_DIR}/diffusion_models"
 VAE_DIR="${MODELS_DIR}/vae"
 TEXT_ENCODER_DIR="${MODELS_DIR}/text_encoders"
 
-# Create directories (Removed LoRA/ClipVision as they weren't in your request)
-mkdir -p "$DIFFUSION_MODELS_DIR" "$VAE_DIR" "$TEXT_ENCODER_DIR"
+# Create directories
+mkdir -p "$DIFFUSION_MODELS_DIR" "$VAE_DIR" "$TEXT_ENCODER_DIR" "$WORKFLOWS_DIR"
 
 # ------------------------------------------------------------------------------
 # 1. FAST DOWNLOAD FUNCTION
@@ -61,4 +62,7 @@ fast_download "https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_fil
 # VAE
 fast_download "https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors" "$VAE_DIR" "flux2-vae.safetensors"
 
-echo "✅ DONE! Please restart ComfyUI to load the new models."
+echo "🚀 --- DOWNLOADING WORKFLOW ---"
+fast_download "https://raw.githubusercontent.com/EmkaczLabs/runpod_comfy/refs/heads/main/flux2dev.json" "$WORKFLOWS_DIR" "flux2dev.json"
+
+echo "✅ DONE! Please restart ComfyUI to load the new models and workflow."
